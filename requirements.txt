@@ -1,6 +1,7 @@
+nltk
 h5py==2.5.0
-Keras==2.0.3
+Keras==2.1.2
 numpy==1.11.2
-tensorflow==1.1.0
-pandas==0.16.2
+tensorflow==1.3.0
+pandas==0i.16.2
 Pillow
