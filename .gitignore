@@ -10,3 +10,8 @@
 .ipynb_checkpoints/*
 .ipynb_checkpoints/
 *.ipynb
+.idea/
+Flickr8k_text/*
+Flicker8k_Dataset/*
+encoded_images.p
+weights-improvement-*
