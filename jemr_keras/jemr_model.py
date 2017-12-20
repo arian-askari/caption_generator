@@ -1,4 +1,10 @@
-import cPickle as pickle
+# coding=utf-8
+"""
+This code contains a class responsible for creating and initializing the model of JEMR method
+"""
+from __future__ import print_function
+
+import cPickle
 
 import numpy as np
 import pandas as pd
@@ -10,14 +16,17 @@ from keras.utils import plot_model
 EMBEDDING_DIM = 128
 
 
-class CaptionGenerator:
+class JemrModel(object):
+    """
+    This class handles creating and initializing of the model for JEMR method
+    """
     def __init__(self):
         self.max_cap_len = None
         self.vocab_size = None
         self.index_word = None
         self.word_index = None
         self.total_samples = None
-        self.encoded_images = pickle.load(open("encoded_images.p", "rb"))
+        self.encoded_images = cPickle.load(open("encoded_images.p", "rb"))
         self.variable_initializer()
 
     def variable_initializer(self):
@@ -30,16 +39,16 @@ class CaptionGenerator:
         """
         df = pd.read_csv('Flickr8k_text/flickr_8k_train_dataset.txt', delimiter='\t')
         nb_samples = df.shape[0]
-        iter = df.iterrows()
+        iter_dataset = df.iterrows()
         caps = []
         for i in range(nb_samples):
-            x = iter.next()
+            x = iter_dataset.next()
             caps.append(x[1][1])
 
         self.total_samples = 0
         for text in caps:
             self.total_samples += len(text.split()) - 1
-        print "Total samples : " + str(self.total_samples)
+        print("Total samples : " + str(self.total_samples))
 
         words = [txt.split() for txt in caps]
         unique = []
@@ -59,9 +68,9 @@ class CaptionGenerator:
             if len(caption.split()) > max_len:
                 max_len = len(caption.split())
         self.max_cap_len = max_len
-        print "Vocabulary size: " + str(self.vocab_size)
-        print "Maximum caption length: " + str(self.max_cap_len)
-        print "Variables initialization done!"
+        print("Vocabulary size: " + str(self.vocab_size))
+        print("Maximum caption length: " + str(self.max_cap_len))
+        print("Variables initialization done!")
 
     def data_generator(self, batch_size=32):
         """
@@ -73,7 +82,7 @@ class CaptionGenerator:
         partial_caps = []
         next_words = []
         images = []
-        print "Generating data..."
+        print("Generating data...")
         gen_count = 0
         df = pd.read_csv('Flickr8k_text/flickr_8k_train_dataset.txt', delimiter='\t')
         nb_samples = df.shape[0]
@@ -126,7 +135,7 @@ class CaptionGenerator:
                         partial_caps = sequence.pad_sequences(partial_caps, maxlen=self.max_cap_len, padding='post')
                         gen_count += 1
                         if gen_count % 1000 == 0:
-                            print "yielding count: " + str(gen_count)
+                            print("yielding count: " + str(gen_count))
                         yield [[images, partial_caps], next_words]
 
                         # initialize for the next batch:
@@ -137,11 +146,21 @@ class CaptionGenerator:
 
     @staticmethod
     def load_image(path):
+        """
+        load image given an image path
+        :param path: path to an image
+        :return: rgb code of an image
+        """
         img = image.load_img(path, target_size=(224, 224))
         x = image.img_to_array(img)
         return np.asarray(x)
 
     def create_model(self, ret_model=False):
+        """
+        create neural network model
+        :param ret_model: true if the model is created during testing
+        :return: created model
+        """
         # base_model = VGG16(weights='imagenet', include_top=False, input_shape = (224, 224, 3))
         # base_model.trainable=False
         image_model = Sequential()
@@ -155,7 +174,7 @@ class CaptionGenerator:
         lang_model.add(LSTM(256, return_sequences=True))
         lang_model.add(TimeDistributed(Dense(EMBEDDING_DIM)))
 
-        l_ = LSTM(1000, return_sequences=False)
+        l_ = LSTM(1000)
         d_ = Dense(self.vocab_size)
         de_ = Dense(EMBEDDING_DIM, activation='relu')
         a_ = Activation('softmax')
@@ -167,7 +186,7 @@ class CaptionGenerator:
             if len(model_lstm) == 1:
                 aggregated_model = model_lstm[0]
             else:
-                aggregated_model = Merge(model_lstm, mode='sum')
+                aggregated_model = Merge(model_lstm)
             model1.add(Merge([image_model, aggregated_model], mode='concat'))
             model1.add(l_)
             model1.add(d_)
@@ -177,7 +196,7 @@ class CaptionGenerator:
             model_lstm += [model1]
 
         model_desc = Sequential()
-        model_desc.add(Merge([image_model, Merge(model_lstm, mode='sum')], mode='concat'))
+        model_desc.add(Merge([image_model, Merge(model_lstm)], mode='concat'))
         model_desc.add(l_)
         model_desc.add(d_)
         model_desc.add(a_)
@@ -186,7 +205,7 @@ class CaptionGenerator:
         model = model_desc
         plot_model(model, to_file='exampleRec.png')
 
-        print "Model created!"
+        print("Model created!")
 
         if ret_model:
             return model
@@ -195,4 +214,9 @@ class CaptionGenerator:
         return model
 
     def get_word(self, index):
+        """
+        convert index of words in dictionary of words to word string
+        :param index: index of words in dictionary
+        :return: a word string
+        """
         return self.index_word[index]

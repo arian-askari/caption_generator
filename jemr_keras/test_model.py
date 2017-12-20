@@ -1,36 +1,57 @@
+# coding=utf-8
+"""
+This code deals with testing the created model
+"""
 from __future__ import print_function
 
-import cPickle as pickle
+import cPickle
 import os
 
 import nltk
 import numpy as np
 from keras.preprocessing import sequence
 
-import caption_generator
+from jemr_model import JemrModel
 
 os.environ['CUDA_VISIBLE_DEVICES'] = ''
 
-cg = caption_generator.CaptionGenerator()
+cg = JemrModel()
+
 
 def process_caption_text(caption):
+    """
+    process caption by removing begin and end symbols from beginning and end of caption
+    :param caption: caption text
+    :return: processed caption
+    """
     caption_split = caption.split()
     processed_caption = caption_split[1:]
     try:
         end_index = processed_caption.index('<end>')
         processed_caption = processed_caption[:end_index]
-    except:
+    except ValueError:
         pass
     return " ".join([word for word in processed_caption])
 
 
 def get_best_caption_text(captions):
+    """
+    find the text of candidate caption with the highest probability of being correct caption
+    :param captions: all caption candidates with their probabilities
+    :return: text of best caption candidate
+    """
     captions.sort(key=lambda l: l[1])
     best_caption = captions[-1][0]
     return " ".join([cg.index_word[index] for index in best_caption])
 
 
 def get_all_captions_texts(captions):
+    """
+    find the text of all candidate caption regardless of their highest probability of being
+    correct caption
+    :param captions: all caption candidates with their probabilities
+    :return: text of all caption candidates
+    """
     final_captions = []
     captions.sort(key=lambda l: l[1])
     for caption in captions:
@@ -40,6 +61,13 @@ def get_all_captions_texts(captions):
 
 
 def generate_captions_probs(model, image, beam_size):
+    """
+    run the model and predict the caption candidates with the highest probabilities of being correct caption
+    :param model: the neural network model
+    :param image: the given image to be captioned
+    :param beam_size: size of beam
+    :return: captions with their probabilities
+    """
     start = [cg.word_index['<start>']]
     captions = [[start, 0.0]]
     while len(captions[0][0]) < cg.max_cap_len:
@@ -61,7 +89,7 @@ def generate_captions_probs(model, image, beam_size):
 
 
 def test_model(weight, img_name, beam_size=3):
-    encoded_images = pickle.load(open("encoded_images.p", "rb"))
+    encoded_images = cPickle.load(open("encoded_images.p", "rb"))
     model = cg.create_model(ret_model=True)
     model.load_weights(weight)
 
@@ -73,6 +101,12 @@ def test_model(weight, img_name, beam_size=3):
 # return [process_caption(caption[0]) for caption in get_all_captions(captions)]
 
 def bleu_score(hypotheses, references):
+    """
+    compute blue score
+    :param hypotheses: generated texts
+    :param references: correct texts
+    :return: blue score of the method
+    """
     return nltk.translate.bleu_score.corpus_bleu(references, hypotheses)
 
 
@@ -80,7 +114,7 @@ def test_model_on_images(weight, img_dir, beam_size=3):
     captions = {}
     with open(img_dir, 'rb') as f_images:
         imgs = f_images.read().strip().split('\n')
-    encoded_images = pickle.load(open("encoded_images.p", "rb"))
+    encoded_images = cPickle.load(open("encoded_images.p", "rb"))
     model = cg.create_model(ret_model=True)
     model.load_weights(weight)
 
@@ -90,7 +124,8 @@ def test_model_on_images(weight, img_dir, beam_size=3):
         print("Predicting for image: " + str(count))
         image = encoded_images[img_name]
         image_captions_indices = generate_captions_probs(model, image, beam_size)
-        print("all captions", [process_caption_text(caption[0]) for caption in get_all_captions_texts(image_captions_indices)])
+        print("all captions",
+              [process_caption_text(caption[0]) for caption in get_all_captions_texts(image_captions_indices)])
         print("best caption", process_caption_text(get_best_caption_text(image_captions_indices)))
         best_caption = process_caption_text(get_best_caption_text(image_captions_indices))
         captions[img_name] = best_caption
@@ -107,7 +142,7 @@ def test_model_on_images(weight, img_dir, beam_size=3):
         row[0] = row[0][:len(row[0]) - 2]
         try:
             image_captions_pair[row[0]].append(row[1])
-        except:
+        except IndexError:
             image_captions_pair[row[0]] = [row[1]]
     f_captions.close()
 
@@ -123,8 +158,8 @@ def test_model_on_images(weight, img_dir, beam_size=3):
 
 
 if __name__ == '__main__':
-    weight = 'weights-improvement-03.hdf5'
+    weight_dir = 'weights-improvement-03.hdf5'
     test_image = '3155451946_c0862c70cb.jpg'
     test_img_dir = 'Flickr8k_text/Flickr_8k.testImages.txt'
     # print test_model(weight, test_image)
-    print(test_model_on_images(weight, test_img_dir, beam_size=3))
+    print(test_model_on_images(weight_dir, test_img_dir))
