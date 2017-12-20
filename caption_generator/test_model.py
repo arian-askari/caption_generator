@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import cPickle as pickle
 
 import nltk
@@ -9,7 +11,7 @@ import caption_generator
 cg = caption_generator.CaptionGenerator()
 
 
-def process_caption(caption):
+def process_caption_text(caption):
     caption_split = caption.split()
     processed_caption = caption_split[1:]
     try:
@@ -20,13 +22,13 @@ def process_caption(caption):
     return " ".join([word for word in processed_caption])
 
 
-def get_best_caption(captions):
+def get_best_caption_text(captions):
     captions.sort(key=lambda l: l[1])
     best_caption = captions[-1][0]
     return " ".join([cg.index_word[index] for index in best_caption])
 
 
-def get_all_captions(captions):
+def get_all_captions_texts(captions):
     final_captions = []
     captions.sort(key=lambda l: l[1])
     for caption in captions:
@@ -35,7 +37,7 @@ def get_all_captions(captions):
     return final_captions
 
 
-def generate_captions(model, image, beam_size):
+def generate_captions_probs(model, image, beam_size):
     start = [cg.word_index['<start>']]
     captions = [[start, 0.0]]
     while len(captions[0][0]) < cg.max_cap_len:
@@ -62,8 +64,8 @@ def test_model(weight, img_name, beam_size=3):
     model.load_weights(weight)
 
     image = encoded_images[img_name]
-    captions = generate_captions(model, image, beam_size)
-    return process_caption(get_best_caption(captions))
+    captions = generate_captions_probs(model, image, beam_size)
+    return process_caption_text(get_best_caption_text(captions))
 
 
 # return [process_caption(caption[0]) for caption in get_all_captions(captions)]
@@ -73,7 +75,6 @@ def bleu_score(hypotheses, references):
 
 
 def test_model_on_images(weight, img_dir, beam_size=3):
-    imgs = []
     captions = {}
     with open(img_dir, 'rb') as f_images:
         imgs = f_images.read().strip().split('\n')
@@ -84,13 +85,15 @@ def test_model_on_images(weight, img_dir, beam_size=3):
     f_pred_caption = open('predicted_captions.txt', 'wb')
 
     for count, img_name in enumerate(imgs):
-        print "Predicting for image: " + str(count)
+        print("Predicting for image: " + str(count))
         image = encoded_images[img_name]
-        image_captions = generate_captions(model, image, beam_size)
-        best_caption = process_caption(get_best_caption(image_captions))
+        image_captions_indices = generate_captions_probs(model, image, beam_size)
+        print("all captions", [process_caption_text(caption[0]) for caption in get_all_captions_texts(image_captions_indices)])
+        print("best caption", process_caption_text(get_best_caption_text(image_captions_indices)))
+        best_caption = process_caption_text(get_best_caption_text(image_captions_indices))
         captions[img_name] = best_caption
-        print img_name + " : " + str(best_caption)
-        f_pred_caption.write(img_name + "\t" + str(best_caption))
+        print(img_name + " : " + str(best_caption))
+        f_pred_caption.write(img_name + "\t" + str(best_caption) + "\n")
         f_pred_caption.flush()
     f_pred_caption.close()
 
@@ -118,8 +121,8 @@ def test_model_on_images(weight, img_dir, beam_size=3):
 
 
 if __name__ == '__main__':
-    weight = 'weights-improvement-48.hdf5'
+    weight = 'weights-improvement-03.hdf5'
     test_image = '3155451946_c0862c70cb.jpg'
     test_img_dir = 'Flickr8k_text/Flickr_8k.testImages.txt'
     # print test_model(weight, test_image)
-    print test_model_on_images(weight, test_img_dir, beam_size=3)
+    print(test_model_on_images(weight, test_img_dir, beam_size=3))

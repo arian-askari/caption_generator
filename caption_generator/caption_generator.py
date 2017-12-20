@@ -20,6 +20,13 @@ class CaptionGenerator:
         self.variable_initializer()
 
     def variable_initializer(self):
+        """
+        initializes Total number of samples (self.total_samples),
+                    Vocabulary size (self.vocab_size),
+                    Maximum caption length (self.max_cap_len),
+                    word to index dictionary (self.word_index), and
+                    index to word dictionary (self.index_word)
+        """
         df = pd.read_csv('Flickr8k_text/flickr_8k_train_dataset.txt', delimiter='\t')
         nb_samples = df.shape[0]
         iter = df.iterrows()
@@ -56,6 +63,12 @@ class CaptionGenerator:
         print "Variables initialization done!"
 
     def data_generator(self, batch_size=32):
+        """
+        Given training data file, yields batches of training data
+        :param batch_size: batch size
+        :return: batches of training data, which is an array of images, partial captions and word
+         next to partial captions, all encoded.
+        """
         partial_caps = []
         next_words = []
         images = []
@@ -63,37 +76,59 @@ class CaptionGenerator:
         gen_count = 0
         df = pd.read_csv('Flickr8k_text/flickr_8k_train_dataset.txt', delimiter='\t')
         nb_samples = df.shape[0]
-        iter = df.iterrows()
+        it_dataset = df.iterrows()
         caps = []
         imgs = []
         for i in range(nb_samples):
-            x = iter.next()
+            x = it_dataset.next()
             caps.append(x[1][1])
             imgs.append(x[1][0])
 
         total_count = 0
         while 1:
+
+            # initialize image_counter at the beginning of each epoch
             image_counter = -1
+
+            # for each instance in the training data:
             for text in caps:
+
+                # handle images:
                 image_counter += 1
                 current_image = self.encoded_images[imgs[image_counter]]
-                for i in range(len(text.split()) - 1):
+
+                # handle captions:
+                caption_words = text.split()
+                for i in range(len(caption_words) - 1):
                     total_count += 1
-                    partial = [self.word_index[txt] for txt in text.split()[:i + 1]]
+
+                    # create partial caption from 0-i'th caption words
+                    partial = [self.word_index[txt] for txt in caption_words[:(i + 1)]]
+
+                    # store partial captions
                     partial_caps.append(partial)
-                    next = np.zeros(self.vocab_size)
-                    next[self.word_index[text.split()[i + 1]]] = 1
-                    next_words.append(next)
+
+                    # create one-hot vector for the next caption word:
+                    next_w = np.zeros(self.vocab_size)
+                    next_w[self.word_index[caption_words[i + 1]]] = 1
+
+                    # store the one-vector of the next word
+                    next_words.append(next_w)
+
+                    # store the current_image once for each word
                     images.append(current_image)
 
+                    # if enough number of caption words to make a batch
                     if total_count >= batch_size:
                         next_words = np.asarray(next_words)
                         images = np.asarray(images)
                         partial_caps = sequence.pad_sequences(partial_caps, maxlen=self.max_cap_len, padding='post')
-                        total_count = 0
                         gen_count += 1
                         print "yielding count: " + str(gen_count)
                         yield [[images, partial_caps], next_words]
+
+                        # initialize for the next batch:
+                        total_count = 0
                         partial_caps = []
                         next_words = []
                         images = []
