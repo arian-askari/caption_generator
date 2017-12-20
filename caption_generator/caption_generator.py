@@ -5,6 +5,7 @@ import pandas as pd
 from keras.layers import LSTM, Embedding, TimeDistributed, Dense, RepeatVector, Merge, Activation
 from keras.models import Sequential
 from keras.preprocessing import image, sequence
+from keras.utils import plot_model
 
 EMBEDDING_DIM = 128
 
@@ -124,7 +125,8 @@ class CaptionGenerator:
                         images = np.asarray(images)
                         partial_caps = sequence.pad_sequences(partial_caps, maxlen=self.max_cap_len, padding='post')
                         gen_count += 1
-                        print "yielding count: " + str(gen_count)
+                        if gen_count % 1000 == 0:
+                            print "yielding count: " + str(gen_count)
                         yield [[images, partial_caps], next_words]
 
                         # initialize for the next batch:
@@ -146,7 +148,6 @@ class CaptionGenerator:
         # image_model.add(base_model)
         # image_model.add(Flatten())
         image_model.add(Dense(EMBEDDING_DIM, input_dim=4096, activation='relu'))
-
         image_model.add(RepeatVector(self.max_cap_len))
 
         lang_model = Sequential()
@@ -154,11 +155,36 @@ class CaptionGenerator:
         lang_model.add(LSTM(256, return_sequences=True))
         lang_model.add(TimeDistributed(Dense(EMBEDDING_DIM)))
 
-        model = Sequential()
-        model.add(Merge([image_model, lang_model], mode='concat'))
-        model.add(LSTM(1000, return_sequences=False))
-        model.add(Dense(self.vocab_size))
-        model.add(Activation('softmax'))
+        l_ = LSTM(1000, return_sequences=False)
+        d_ = Dense(self.vocab_size)
+        de_ = Dense(EMBEDDING_DIM, activation='relu')
+        a_ = Activation('softmax')
+        r_ = RepeatVector(self.max_cap_len)
+
+        model_lstm = [lang_model]
+        for i in range(3):
+            model1 = Sequential()
+            if len(model_lstm) == 1:
+                aggregated_model = model_lstm[0]
+            else:
+                aggregated_model = Merge(model_lstm, mode='sum')
+            model1.add(Merge([image_model, aggregated_model], mode='concat'))
+            model1.add(l_)
+            model1.add(d_)
+            model1.add(a_)
+            model1.add(de_)
+            model1.add(r_)
+            model_lstm += [model1]
+
+        model_desc = Sequential()
+        model_desc.add(Merge([image_model, Merge(model_lstm, mode='sum')], mode='concat'))
+        model_desc.add(l_)
+        model_desc.add(d_)
+        model_desc.add(a_)
+        # model3.add(Dense(EMBEDDING_DIM, activation='relu'))
+
+        model = model_desc
+        plot_model(model, to_file='exampleRec.png')
 
         print "Model created!"
 

@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import cPickle as pickle
+import os
 
 import nltk
 import numpy as np
@@ -8,8 +9,9 @@ from keras.preprocessing import sequence
 
 import caption_generator
 
-cg = caption_generator.CaptionGenerator()
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
 
+cg = caption_generator.CaptionGenerator()
 
 def process_caption_text(caption):
     caption_split = caption.split()
